@@ -1,0 +1,193 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+import "status.proto";
+
+enum InputPermissionState {
+  INPUT_PERMISSION_STATE_UNSPECIFIED = 0;
+  INPUT_PERMISSION_STATE_GRANTED = 1;
+  INPUT_PERMISSION_STATE_DENIED = 2;
+  INPUT_PERMISSION_STATE_UNSUPPORTED = 3;
+}
+
+message BeginInputSessionRequest {
+  uint64 request_id = 1;
+  // When true, the receiving desktop is a stable gateway for a workspace-wide
+  // session instead of being the permanently selected injection target.
+  bool workspace_routing = 2;
+}
+
+message EndInputSessionRequest {
+  uint64 request_id = 1;
+  fixed64 session_id = 2;
+  uint32 epoch = 3;
+}
+
+message InputSessionResult {
+  uint64 request_id = 1;
+  Status status = 2;
+  fixed64 session_id = 3;
+  uint32 epoch = 4;
+  InputPermissionState permission_state = 5;
+  uint32 lease_timeout_ms = 6;
+  uint32 max_datagram_rate = 7 [deprecated = true];
+  uint32 max_reliable_events_per_frame = 8;
+  // Includes empty keepalive frames.
+  uint32 max_reliable_frame_rate = 9;
+  // Optional receiver capability. Absent/false preserves legacy client behavior.
+  bool supports_system_gestures = 10;
+  bool workspace_routing_active = 11;
+  string gateway_device_id = 12;
+  string logical_target_device_id = 13;
+  string target_display_id = 14;
+  uint64 control_epoch = 15;
+}
+
+enum InputRouteState {
+  INPUT_ROUTE_STATE_UNSPECIFIED = 0;
+  INPUT_ROUTE_STATE_ACTIVE = 1;
+  INPUT_ROUTE_STATE_SUSPENDED = 2;
+  INPUT_ROUTE_STATE_ENDED = 3;
+}
+
+enum InputFocusCause {
+  INPUT_FOCUS_CAUSE_UNSPECIFIED = 0;
+  INPUT_FOCUS_CAUSE_SESSION_STARTED = 1;
+  INPUT_FOCUS_CAUSE_MOBILE_PORTAL = 2;
+  INPUT_FOCUS_CAUSE_DESKTOP_PORTAL = 3;
+  INPUT_FOCUS_CAUSE_PHYSICAL_ACTIVITY = 4;
+  INPUT_FOCUS_CAUSE_SESSION_ENDED = 5;
+  INPUT_FOCUS_CAUSE_GATEWAY_UNAVAILABLE = 6;
+}
+
+// Unsolicited focus/control notification. session_id is zero for observer-only
+// workspace focus changes and is populated for the mobile session that owns
+// the current gateway lease.
+message InputFocusChanged {
+  fixed64 session_id = 1;
+  uint32 epoch = 2;
+  InputRouteState state = 3;
+  InputFocusCause cause = 4;
+  string controller_device_id = 5;
+  string logical_target_device_id = 6;
+  string target_display_id = 7;
+  uint64 control_epoch = 8;
+  string message = 9;
+  bool supports_system_gestures = 10;
+}
+
+message ReliableInputFrame {
+  fixed64 session_id = 1;
+  uint32 epoch = 2;
+  uint64 sequence = 3;
+  uint64 elapsed_us = 4;
+  repeated ReliableInputEvent events = 5;
+  // Pointer and scroll motion share the same ordered QUIC stream as buttons
+  // and keys. This matches SubnetDesk's FIFO input path and avoids Datagram
+  // reordering or cumulative catch-up jumps on otherwise healthy LAN links.
+  OrderedMotionSample motion = 6;
+}
+
+message OrderedMotionSample {
+  sint64 pointer_total_x_256 = 1;
+  sint64 pointer_total_y_256 = 2;
+  sint64 scroll_total_x_256 = 3;
+  sint64 scroll_total_y_256 = 4;
+  bool precise_scroll = 5;
+}
+
+message ReliableInputEvent {
+  oneof event {
+    PointerButton pointer_button = 1;
+    KeyEvent key = 2;
+    TextCommit text_commit = 3;
+    ReleaseAll release_all = 4;
+    ScrollGesture scroll_gesture = 5;
+    SystemGesture system_gesture = 6;
+  }
+}
+
+// DockSwipe v1: axis 1=horizontal, 2=vertical; phase 1=begin, 2=change,
+// 4=end, 8=cancel. Values are bounded and validated; never native event bytes.
+message SystemGesture {
+  uint32 format_version = 1;
+  uint32 axis = 2;
+  uint32 phase = 3;
+  double progress = 4;
+  double velocity_x = 5;
+  double velocity_y = 6;
+}
+
+enum ScrollGesturePhase {
+  SCROLL_GESTURE_PHASE_UNSPECIFIED = 0;
+  SCROLL_GESTURE_PHASE_BEGAN = 1;
+  SCROLL_GESTURE_PHASE_ENDED = 2;
+  SCROLL_GESTURE_PHASE_CANCELLED = 3;
+  SCROLL_GESTURE_PHASE_MOMENTUM_BEGAN = 4;
+  SCROLL_GESTURE_PHASE_MOMENTUM_ENDED = 5;
+}
+
+message ScrollGesture {
+  ScrollGesturePhase phase = 1;
+}
+
+// Motion fields are cumulative fixed-point counters. Losing an intermediate
+// datagram does not lose motion because the next datagram contains new totals.
+message MotionDatagram {
+  option deprecated = true;
+  fixed64 session_id = 1;
+  uint32 epoch = 2;
+  uint64 packet_sequence = 3;
+  uint64 elapsed_us = 4;
+  sint64 pointer_total_x_256 = 5;
+  sint64 pointer_total_y_256 = 6;
+  sint64 scroll_total_x_256 = 7;
+  sint64 scroll_total_y_256 = 8;
+  bool precise_scroll = 9;
+  // The server must apply reliable input through this sequence before applying
+  // this motion sample. The client does not wait for an acknowledgement. If the
+  // reliable stream has not caught up yet, the datagram is discarded; a later
+  // cumulative sample recovers the motion.
+  uint64 reliable_barrier = 10;
+}
+
+message InputFeedback {
+  fixed64 session_id = 1;
+  uint32 epoch = 2;
+  uint64 reliable_sequence = 3;
+  uint64 motion_packet_sequence = 4;
+  int64 server_time_ms = 5;
+  Status status = 6;
+  // Rolling loss sample over the latest 256 client motion sequence numbers.
+  uint32 motion_datagrams_received = 7;
+  uint32 motion_datagrams_missing = 8;
+}
+
+enum MouseButton {
+  MOUSE_BUTTON_UNSPECIFIED = 0;
+  MOUSE_BUTTON_LEFT = 1;
+  MOUSE_BUTTON_RIGHT = 2;
+  MOUSE_BUTTON_MIDDLE = 3;
+}
+
+message PointerButton {
+  MouseButton button = 1;
+  bool down = 2;
+  // Native click ordinal for this physical down/up pair (1, 2, or 3), not a
+  // request to synthesize that many additional clicks.
+  uint32 click_count = 3;
+}
+
+// USB HID keyboard usage ID (Usage Page 0x07). Using HID usages keeps the
+// protocol platform-neutral while each desktop backend maps to native codes.
+message KeyEvent {
+  uint32 hid_usage = 1;
+  bool down = 2;
+  bool repeat = 3;
+}
+
+message TextCommit {
+  string text = 1;
+}
+
+message ReleaseAll {}

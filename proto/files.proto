@@ -1,0 +1,135 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+
+message RemoteFileCapabilityConstraints {
+  repeated string share_ids = 1;
+  bool writable = 2;
+}
+
+// ── Remote Files ─────────────────────────────────────────────────
+//
+// A remote-file operation owns one feature stream, so stream_id in the common
+// feature envelope is the correlation identifier. These messages deliberately
+// avoid JSON to preserve unknown-field compatibility across v1 minor releases.
+
+enum RemoteFileEntryKind {
+  REMOTE_FILE_ENTRY_KIND_UNSPECIFIED = 0;
+  REMOTE_FILE_ENTRY_KIND_FILE = 1;
+  REMOTE_FILE_ENTRY_KIND_FOLDER = 2;
+}
+
+enum RemoteFileSortKey {
+  REMOTE_FILE_SORT_KEY_UNSPECIFIED = 0;
+  REMOTE_FILE_SORT_KEY_NAME = 1;
+  REMOTE_FILE_SORT_KEY_MODIFIED = 2;
+  REMOTE_FILE_SORT_KEY_TYPE = 3;
+  REMOTE_FILE_SORT_KEY_SIZE = 4;
+}
+
+enum RemoteFileSortDirection {
+  REMOTE_FILE_SORT_DIRECTION_UNSPECIFIED = 0;
+  REMOTE_FILE_SORT_DIRECTION_ASCENDING = 1;
+  REMOTE_FILE_SORT_DIRECTION_DESCENDING = 2;
+}
+
+message RemoteFileShareInfo {
+  string id = 1;
+  string name = 2;
+  bool writable = 3;
+}
+
+message RemoteFileEntryInfo {
+  string name = 1;
+  string relative_path = 2;
+  RemoteFileEntryKind kind = 3;
+  uint64 size = 4;
+  int64 modified_at_ms = 5;
+}
+
+message RemoteFileListSharesRequest {}
+
+message RemoteFileListDirectoryRequest {
+  string share_id = 1;
+  string relative_path = 2;
+  optional string cursor = 3;
+  uint32 limit = 4;
+  optional string search = 5;
+  RemoteFileSortKey sort_key = 6;
+  RemoteFileSortDirection sort_direction = 7;
+}
+
+message RemoteFileCreateDirectoryRequest {
+  string share_id = 1;
+  string relative_path = 2;
+  string name = 3;
+}
+
+message RemoteFileRenameRequest {
+  string share_id = 1;
+  string relative_path = 2;
+  string new_name = 3;
+}
+
+message RemoteFileDeleteRequest {
+  string share_id = 1;
+  string relative_path = 2;
+}
+
+message RemoteFileDownloadRequest {
+  string share_id = 1;
+  string relative_path = 2;
+}
+
+message RemoteFileThumbnailRequest {
+  string share_id = 1;
+  string relative_path = 2;
+  uint32 max_dimension = 3;
+}
+
+message RemoteFileUploadRequest {
+  string share_id = 1;
+  string relative_path = 2;
+  string name = 3;
+  uint64 size = 4;
+  bool overwrite = 5;
+  optional int64 expected_modified_at_ms = 6;
+}
+
+message RemoteFileRequestFrame {
+  oneof body {
+    RemoteFileListSharesRequest list_shares = 10;
+    RemoteFileListDirectoryRequest list_directory = 11;
+    RemoteFileCreateDirectoryRequest create_directory = 12;
+    RemoteFileRenameRequest rename = 13;
+    RemoteFileDeleteRequest delete = 14;
+    RemoteFileDownloadRequest download = 15;
+    RemoteFileThumbnailRequest thumbnail = 16;
+    RemoteFileUploadRequest upload = 17;
+  }
+}
+
+message RemoteFileResponseFrame {
+  bool ok = 1;
+  optional string error = 2;
+  repeated RemoteFileShareInfo shares = 3;
+  repeated RemoteFileEntryInfo entries = 4;
+  optional string next_cursor = 5;
+  optional RemoteFileEntryInfo entry = 6;
+  uint64 thumbnail_size = 7;
+  optional string thumbnail_media_type = 8;
+  optional RemoteFileErrorCode error_code = 9;
+}
+
+enum RemoteFileErrorCode {
+  REMOTE_FILE_ERROR_CODE_UNSPECIFIED = 0;
+  REMOTE_FILE_ERROR_CODE_INVALID_ARGUMENT = 1;
+  REMOTE_FILE_ERROR_CODE_PERMISSION_DENIED = 2;
+  REMOTE_FILE_ERROR_CODE_NOT_FOUND = 3;
+  REMOTE_FILE_ERROR_CODE_CONFLICT = 4;
+  REMOTE_FILE_ERROR_CODE_RESOURCE_EXHAUSTED = 5;
+  REMOTE_FILE_ERROR_CODE_FAILED_PRECONDITION = 6;
+  REMOTE_FILE_ERROR_CODE_UNAVAILABLE = 7;
+  REMOTE_FILE_ERROR_CODE_CANCELLED = 8;
+  REMOTE_FILE_ERROR_CODE_INTERNAL = 9;
+}

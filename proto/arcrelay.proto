@@ -1,0 +1,18 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+// v1 public contract entrypoint; feature sources own their models.
+import public "actions.proto";
+import public "blob.proto";
+import public "clipboard.proto";
+import public "control.proto";
+import public "device.proto";
+import public "files.proto";
+import public "input.proto";
+import public "media.proto";
+import public "notifications.proto";
+import public "print.proto";
+import public "status.proto";
+import public "system.proto";
+import public "transfer.proto";
+import public "windows.proto";

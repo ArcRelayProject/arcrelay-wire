@@ -1,0 +1,99 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+import "status.proto";
+
+message FileManifestEntry {
+  uint64 file_id = 1;
+  // Portable '/'-separated path relative to the user-approved destination.
+  // Receivers must reject absolute paths, empty components, '.'/'..', NUL,
+  // platform prefixes, and any symlink traversal outside that destination.
+  string relative_path = 2;
+  uint64 size = 3;
+  string media_type = 4;
+  int64 modified_at_ms = 5;
+}
+
+message TransferOffer {
+  // The offer initiator is always the sender. Because both peers can emit an
+  // offer, the same exchange supports desktop-to-mobile and mobile-to-desktop
+  // transfers without direction fields whose point of view can be ambiguous.
+  // IDs are chosen by the offer initiator and echoed by accept/cancel frames.
+  uint64 request_id = 1;
+  uint64 transfer_id = 2;
+  string display_name = 3;
+  repeated FileManifestEntry files = 4;
+  uint64 total_bytes = 5;
+  reserved 6, 7, 8;
+  int64 created_at_ms = 9;
+  repeated TransferPreview previews = 10;
+  reserved 11;
+}
+
+message TransferPreview {
+  uint64 file_id = 1;
+  string media_type = 2;
+  // Bounded encoded thumbnail bytes. Receivers must not treat these bytes as
+  // the original file and must never write them to the destination folder.
+  bytes data = 3;
+}
+
+message TransferAccept {
+  // Echoes the offer request ID. The receiving peer issues one short-lived,
+  // single-use stream grant for each file it accepts.
+  uint64 request_id = 1;
+  uint64 transfer_id = 2;
+  repeated FileTransferGrant grants = 3;
+  uint32 chunk_size = 4;
+  reserved 5, 6, 7, 8;
+}
+
+message FileTransferGrant {
+  uint64 file_id = 1;
+  reserved 2;
+  bytes ticket = 3;
+  int64 expires_at_ms = 4;
+}
+
+message TransferCancel {
+  uint64 request_id = 1;
+  uint64 transfer_id = 2;
+  Status status = 3;
+}
+
+message TransferProgress {
+  uint64 transfer_id = 1;
+  // Zero means aggregate transfer progress; otherwise this is one file.
+  uint64 file_id = 2;
+  uint64 completed_bytes = 3;
+  uint64 total_bytes = 4;
+  Status status = 5;
+}
+
+// The sender opens an authenticated transfer feature stream (operation "file").
+// FileStreamOpen is its opening payload. After FileStreamHeader accepts it,
+// send exactly the manifest size in raw bytes, a 32-byte SHA-256 trailer, then
+// FIN. FileStreamResult acknowledges validated and durably stored content.
+message FileStreamOpen {
+  uint64 transfer_id = 1;
+  uint64 file_id = 2;
+  bytes ticket = 3;
+  reserved 4;
+}
+
+message FileStreamHeader {
+  Status status = 1;
+  uint64 transfer_id = 2;
+  uint64 file_id = 3;
+  reserved 4;
+  uint32 chunk_size = 5;
+}
+
+message FileStreamResult {
+  Status status = 1;
+  uint64 transfer_id = 2;
+  uint64 file_id = 3;
+  uint64 received_size = 4;
+  // SHA-256 of the complete reconstructed file, as received on this stream.
+  bytes sha256 = 5;
+}

@@ -1,0 +1,42 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+
+// ── Device ──────────────────────────────────────────────────────────
+
+enum DeviceType {
+  DEVICE_TYPE_UNSPECIFIED  = 0;
+  DEVICE_TYPE_MACBOOK      = 1;
+  DEVICE_TYPE_WINDOWS_PC   = 2;
+  DEVICE_TYPE_LINUX_SERVER = 3;
+  DEVICE_TYPE_IPAD         = 4;
+  DEVICE_TYPE_IPHONE       = 5;
+  DEVICE_TYPE_ANDROID      = 6;
+}
+
+message DeviceInfo {
+  string     name         = 1;
+  string     ip           = 2;
+  DeviceType device_type  = 3;
+  bool       is_connected = 4;
+  optional uint32 latency_ms = 5;
+}
+
+message LocalDeviceInfo {
+  string name        = 1;
+  string ip          = 2;
+  string app_version = 3;
+  uint32 port        = 4;
+}
+
+message ConnectionConfig {
+  uint32 port           = 1;
+  bool   encrypted      = 2;
+  bool   auto_reconnect = 3;
+}
+
+message DeviceSnapshot {
+  LocalDeviceInfo     local_device  = 1;
+  ConnectionConfig    config        = 2;
+  repeated DeviceInfo peers         = 3;
+}

@@ -1,0 +1,51 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+import "status.proto";
+
+// Blob and file-transfer control metadata. Blob/file bytes never travel in a
+// control frame; a successful request returns a short-lived ticket that opens
+// an independent QUIC stream.
+
+message BlobRef {
+  bytes blob_id = 1;
+  uint64 size = 2;
+  string media_type = 3;
+  bytes sha256 = 4;
+}
+
+message GetBlobRequest {
+  bytes blob_id = 1;
+}
+
+message BlobTicket {
+  uint64 transfer_id = 1;
+  bytes ticket = 2;
+  BlobRef blob = 3;
+  uint32 chunk_size = 4;
+  int64 expires_at_ms = 5;
+}
+
+// The client opens a new bidirectional QUIC stream, writes stream kind 3,
+// then sends BlobStreamOpen as a length-delimited protobuf frame. The server
+// replies with one BlobStreamHeader followed by ordered BlobStreamChunk
+// frames, then finishes its send side. Tickets are short-lived and single-use.
+message BlobStreamOpen {
+  uint64 transfer_id = 1;
+  bytes ticket = 2;
+  uint64 offset = 3;
+}
+
+message BlobStreamHeader {
+  Status status = 1;
+  BlobRef blob = 2;
+  uint64 accepted_offset = 3;
+  uint32 chunk_size = 4;
+}
+
+message BlobStreamChunk {
+  uint64 transfer_id = 1;
+  uint64 offset = 2;
+  bytes data = 3;
+  bool end_of_blob = 4;
+}

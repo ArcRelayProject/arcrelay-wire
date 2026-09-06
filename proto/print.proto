@@ -1,0 +1,194 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+import "status.proto";
+
+// ── LAN Printing ─────────────────────────────────────────────────
+//
+// Printing runs inside an authenticated ArcRelay v1 Print session and requires
+// a central PrintSubmit capability grant. The stable root device identity is
+// also used for job ownership, idempotency, audit, and rate limiting.
+
+message PrintClientFrame {
+  uint64 request_id = 1;
+  uint32 timeout_ms = 2;
+  oneof body {
+    PrintListPrintersRequest list_printers = 10;
+    PrintCreateJobRequest create_job = 11;
+    PrintGetJobRequest get_job = 12;
+    PrintCancelJobRequest cancel_job = 13;
+  }
+}
+
+message PrintServerFrame {
+  uint64 request_id = 1;
+  oneof body {
+    PrintPrinterList printer_list = 10;
+    PrintJobResult job_result = 11;
+    PrintJobEvent job_event = 12;
+    Status status = 20;
+  }
+}
+
+message PrintListPrintersRequest {}
+
+enum PrintPrinterState {
+  PRINT_PRINTER_STATE_UNSPECIFIED = 0;
+  PRINT_PRINTER_STATE_READY = 1;
+  PRINT_PRINTER_STATE_BUSY = 2;
+  PRINT_PRINTER_STATE_OFFLINE = 3;
+  PRINT_PRINTER_STATE_ERROR = 4;
+}
+
+enum PrintColorMode {
+  PRINT_COLOR_MODE_UNSPECIFIED = 0;
+  PRINT_COLOR_MODE_MONOCHROME = 1;
+  PRINT_COLOR_MODE_COLOR = 2;
+}
+
+enum PrintDuplexMode {
+  PRINT_DUPLEX_MODE_UNSPECIFIED = 0;
+  PRINT_DUPLEX_MODE_ONE_SIDED = 1;
+  PRINT_DUPLEX_MODE_TWO_SIDED_LONG_EDGE = 2;
+  PRINT_DUPLEX_MODE_TWO_SIDED_SHORT_EDGE = 3;
+}
+
+enum PrintOrientation {
+  PRINT_ORIENTATION_UNSPECIFIED = 0;
+  PRINT_ORIENTATION_PORTRAIT = 1;
+  PRINT_ORIENTATION_LANDSCAPE = 2;
+}
+
+message PrintMediaSize {
+  string name = 1;
+  uint32 width_microns = 2;
+  uint32 height_microns = 3;
+}
+
+message PrintResolution {
+  uint32 horizontal_dpi = 1;
+  uint32 vertical_dpi = 2;
+}
+
+message PrintPrinterCapabilities {
+  repeated PrintMediaSize media_sizes = 1;
+  repeated PrintColorMode color_modes = 2;
+  repeated PrintDuplexMode duplex_modes = 3;
+  repeated PrintResolution resolutions = 4;
+  uint32 max_copies = 5;
+  bool supports_page_ranges = 6;
+  bool supports_collation = 7;
+  repeated string accepted_document_types = 8;
+}
+
+message PrintPublishedPrinter {
+  string share_id = 1;
+  string display_name = 2;
+  PrintPrinterState state = 3;
+  PrintPrinterCapabilities capabilities = 4;
+  uint64 capability_revision = 5;
+}
+
+message PrintPrinterList {
+  Status status = 1;
+  string source_device_id = 2;
+  string source_device_name = 3;
+  repeated PrintPublishedPrinter printers = 4;
+}
+
+message PrintPageRange {
+  uint32 first = 1;
+  uint32 last = 2;
+}
+
+message PrintJobOptions {
+  uint32 copies = 1;
+  PrintColorMode color_mode = 2;
+  PrintDuplexMode duplex_mode = 3;
+  PrintOrientation orientation = 4;
+  string media_name = 5;
+  repeated PrintPageRange page_ranges = 6;
+  bool collate = 7;
+}
+
+message PrintDocumentMetadata {
+  string name = 1;
+  string media_type = 2;
+  uint64 size_bytes = 3;
+  bytes sha256 = 4;
+}
+
+message PrintCreateJobRequest {
+  string client_job_id = 1;
+  string printer_share_id = 2;
+  PrintDocumentMetadata document = 3;
+  PrintJobOptions options = 4;
+}
+
+message PrintGetJobRequest {
+  string job_id = 1;
+}
+
+message PrintCancelJobRequest {
+  string job_id = 1;
+}
+
+enum PrintJobState {
+  PRINT_JOB_STATE_UNSPECIFIED = 0;
+  PRINT_JOB_STATE_OFFERED = 1;
+  PRINT_JOB_STATE_RECEIVING = 2;
+  PRINT_JOB_STATE_VALIDATING = 3;
+  PRINT_JOB_STATE_READY = 4;
+  PRINT_JOB_STATE_QUEUED = 5;
+  PRINT_JOB_STATE_PRINTING = 6;
+  PRINT_JOB_STATE_COMPLETED = 7;
+  PRINT_JOB_STATE_HELD = 8;
+  PRINT_JOB_STATE_CANCELLED = 9;
+  PRINT_JOB_STATE_FAILED = 10;
+  PRINT_JOB_STATE_SUBMITTING = 11;
+  PRINT_JOB_STATE_AMBIGUOUS = 12;
+}
+
+message PrintJobInfo {
+  string job_id = 1;
+  string client_job_id = 2;
+  string printer_share_id = 3;
+  PrintJobState state = 4;
+  optional string failure_message = 5;
+  int64 created_at_ms = 6;
+  int64 updated_at_ms = 7;
+}
+
+message PrintJobResult {
+  Status status = 1;
+  PrintJobInfo job = 2;
+  bytes upload_ticket = 3;
+  int64 upload_ticket_expires_at_ms = 4;
+}
+
+message PrintJobEvent {
+  uint64 sequence = 1;
+  PrintJobInfo job = 2;
+}
+
+// A document upload uses a dedicated client-initiated bidirectional stream.
+// The first framed message is PrintDocumentOpen, followed by bounded chunks;
+// the server responds exactly once with PrintDocumentUploadResult.
+message PrintDocumentOpen {
+  string job_id = 1;
+  uint64 size_bytes = 2;
+  bytes sha256 = 3;
+  bytes upload_ticket = 4;
+}
+
+message PrintDocumentChunk {
+  uint64 offset = 1;
+  bytes data = 2;
+}
+
+message PrintDocumentUploadResult {
+  Status status = 1;
+  string job_id = 2;
+  uint64 received_bytes = 3;
+  bytes sha256 = 4;
+}

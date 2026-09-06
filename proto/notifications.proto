@@ -1,0 +1,37 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+
+message GetNotificationsRequest {
+  bool include_read = 1;
+  uint32 limit = 2;
+}
+
+// ── Host Notifications ────────────────────────────────────────────
+
+enum NotificationKind {
+  NOTIFICATION_KIND_UNSPECIFIED     = 0;
+  NOTIFICATION_KIND_INFO            = 1;
+  NOTIFICATION_KIND_TASK_COMPLETED  = 2;
+  NOTIFICATION_KIND_ACTION_REQUIRED = 3;
+}
+
+message NotificationInfo {
+  string id = 1;
+  string title = 2;
+  string body = 3;
+  string source = 4;
+  NotificationKind kind = 5;
+  optional string reference = 6;
+  int64 created_at_ms = 7;
+  optional int64 read_at_ms = 8;
+  optional string read_by_device_name = 9;
+}
+
+message NotificationListSnapshot {
+  repeated NotificationInfo notifications = 1;
+}
+
+message MarkNotificationReadCmd {
+  string notification_id = 1;
+}

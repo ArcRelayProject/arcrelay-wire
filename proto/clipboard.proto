@@ -1,0 +1,207 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+import "blob.proto";
+import "status.proto";
+
+message GetClipboardRequest {
+  uint32 history_limit = 1;
+  optional int64 cursor_timestamp_ms = 2;
+  optional uint64 cursor_id = 3;
+  reserved 4;
+  string search = 5;
+  repeated ClipboardContentKind kinds = 6;
+  bool favorite_only = 7;
+  repeated string label_ids = 8;
+}
+
+message GetClipboardSyncRequest {
+  uint64 after_local_id = 1;
+  uint32 limit = 2;
+}
+
+enum ClipboardSyncChangeKind {
+  CLIPBOARD_SYNC_CHANGE_KIND_UNSPECIFIED = 0;
+  CLIPBOARD_SYNC_CHANGE_KIND_COPY = 1;
+  CLIPBOARD_SYNC_CHANGE_KIND_EDIT = 2;
+  CLIPBOARD_SYNC_CHANGE_KIND_FAVORITE = 3;
+  CLIPBOARD_SYNC_CHANGE_KIND_DELETE = 4;
+  CLIPBOARD_SYNC_CHANGE_KIND_SNAPSHOT = 5;
+  CLIPBOARD_SYNC_CHANGE_KIND_LABEL = 6;
+}
+
+message ClipboardLabel {
+  string id = 1;
+  string name = 2;
+  string color = 3;
+  uint64 revision = 4;
+  string updated_by_device_id = 5;
+  bool deleted = 6;
+}
+
+message ClipboardLabelMembership {
+  string label_id = 1;
+  bool attached = 2;
+  uint64 revision = 3;
+  string updated_by_device_id = 4;
+}
+
+message ClipboardRichTextPayload {
+  string plain_text = 1;
+  BlobRef html = 2;
+  optional BlobRef rtf = 3;
+}
+
+message ClipboardSyncRecord {
+  string sync_id = 1;
+  ClipboardContentKind kind = 2;
+  optional uint32 width = 5;
+  optional uint32 height = 6;
+  string preview = 7;
+  optional string source_app = 8;
+  string source_device_id = 9;
+  string source_device_name = 10;
+  int64 captured_at_ms = 11;
+  uint64 revision = 12;
+  string updated_by_device_id = 13;
+  bool favorite = 14;
+  bool deleted = 15;
+  ClipboardSyncChangeKind change_kind = 16;
+  bool live = 17;
+  uint64 favorite_revision = 18;
+  string favorite_updated_by_device_id = 19;
+  repeated ClipboardLabel labels = 20;
+  repeated ClipboardLabelMembership label_memberships = 21;
+  string text_syntax_json = 22;
+  oneof payload {
+    string text = 30;
+    ClipboardRichTextPayload rich_text = 31;
+    BlobRef image = 32;
+  }
+}
+
+message ClipboardSyncPage {
+  repeated ClipboardSyncRecord records = 1;
+  optional uint64 next_cursor = 2;
+}
+
+message ApplyClipboardSyncRecordCmd {
+  ClipboardSyncRecord record = 1;
+  // Blob upload IDs are their SHA-256/blob IDs, so no separate bindings are
+  // carried in the control frame.
+  reserved 2;
+}
+
+message ClipboardBlobUploadOpen {
+  bytes upload_id = 1;
+  uint64 size = 2;
+  bytes sha256 = 3;
+  string media_type = 4;
+}
+
+message ClipboardBlobUploadHeader {
+  Status status = 1;
+  bytes upload_id = 2;
+  uint32 chunk_size = 3;
+}
+
+message ClipboardBlobUploadChunk {
+  bytes upload_id = 1;
+  uint64 offset = 2;
+  bytes data = 3;
+  bool end_of_upload = 4;
+}
+
+message ClipboardBlobUploadResult {
+  Status status = 1;
+  bytes upload_id = 2;
+  uint64 received_size = 3;
+  bytes sha256 = 4;
+}
+
+// ── Clipboard ───────────────────────────────────────────────────────
+
+enum ClipboardContentKind {
+  CLIPBOARD_CONTENT_KIND_UNSPECIFIED = 0;
+  CLIPBOARD_CONTENT_KIND_TEXT        = 1;
+  CLIPBOARD_CONTENT_KIND_HTML        = 2;
+  CLIPBOARD_CONTENT_KIND_IMAGE       = 3;
+  CLIPBOARD_CONTENT_KIND_FILES       = 4;
+}
+
+// Summary-only metadata. Clipboard payloads remain in the host repository and
+// are addressed by id when the user requests a paste.
+message ClipboardEntry {
+  uint64 id                        = 1;
+  ClipboardContentKind kind       = 2;
+  string preview                   = 3;
+  optional string source_app       = 4;
+  int64 timestamp_ms               = 5;
+  uint64 size_bytes                = 6;
+  uint32 item_count                = 7;
+  optional uint32 width            = 8;
+  optional uint32 height           = 9;
+  bool sensitive                   = 10;
+  bool favorite                    = 11;
+  uint32 copy_count                = 12;
+  bool available                   = 13;
+  repeated ClipboardLabel labels  = 14;
+}
+
+message ClipboardSnapshot {
+  repeated ClipboardEntry history = 1;
+  optional int64 next_cursor_timestamp_ms = 2;
+  optional uint64 next_cursor_id = 3;
+  reserved 4;
+  ClipboardPolicy policy = 5;
+  repeated ClipboardLabel labels = 6;
+}
+
+message ClipboardPolicy {
+  bool history_enabled = 1;
+  uint32 max_items = 2;
+  uint64 max_bytes = 3;
+  uint32 retention_days = 4;
+  bool save_sensitive = 5;
+}
+
+message SetClipboardCmd {
+  string content = 1;
+}
+
+message ClearClipboardHistoryCmd {}
+
+message PasteClipboardRecordCmd {
+  uint64 record_id = 1;
+}
+
+message DeleteClipboardRecordCmd {
+  uint64 record_id = 1;
+}
+
+message SetClipboardFavoriteCmd {
+  uint64 record_id = 1;
+  bool favorite = 2;
+}
+
+message CreateClipboardLabelCmd {
+  string name = 1;
+  string color = 2;
+}
+
+message UpdateClipboardLabelCmd {
+  string label_id = 1;
+  string name = 2;
+  string color = 3;
+}
+
+message DeleteClipboardLabelCmd { string label_id = 1; }
+
+message SetClipboardLabelsCmd {
+  uint64 record_id = 1;
+  repeated string label_ids = 2;
+}
+
+message UpdateClipboardPolicyCmd {
+  ClipboardPolicy policy = 1;
+}

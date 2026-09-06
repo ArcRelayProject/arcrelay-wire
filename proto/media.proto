@@ -1,0 +1,71 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+
+// ── Media Control ───────────────────────────────────────────────────
+
+enum MediaConfidence {
+  MEDIA_CONFIDENCE_UNSPECIFIED    = 0;
+  MEDIA_CONFIDENCE_AUTHORITATIVE  = 1;  // Full info from AppleScript
+  MEDIA_CONFIDENCE_APP_DETECTED   = 2;  // App running, no track info
+  MEDIA_CONFIDENCE_UNAVAILABLE    = 3;  // No media app detected
+}
+
+message PlaybackInfo {
+  string title          = 1;
+  string artist         = 2;
+  string source_app     = 3;
+  double position_secs  = 4;
+  double duration_secs  = 5;
+  bool   is_playing     = 6;
+  MediaConfidence confidence = 7;
+}
+
+message VolumeInfo {
+  uint32 system_volume = 1;
+  bool   is_muted      = 2;
+}
+
+message AppVolume {
+  string app_name = 1;
+  uint32 volume   = 2;
+}
+
+message MediaStateSnapshot {
+  optional PlaybackInfo playback = 1;
+  VolumeInfo volume              = 2;
+  repeated AppVolume app_volumes = 3;
+  bool microphone_active         = 4;
+  bool dnd_active                = 5;
+}
+
+enum PlaybackAction {
+  PLAYBACK_ACTION_UNSPECIFIED   = 0;
+  PLAYBACK_ACTION_PLAY          = 1;
+  PLAYBACK_ACTION_PAUSE         = 2;
+  PLAYBACK_ACTION_NEXT          = 3;
+  PLAYBACK_ACTION_PREVIOUS      = 4;
+  PLAYBACK_ACTION_SEEK_FORWARD  = 5;
+  PLAYBACK_ACTION_SEEK_BACKWARD = 6;
+}
+
+message PlaybackActionCmd {
+  PlaybackAction action = 1;
+}
+
+message SetSystemVolumeCmd {
+  uint32 volume = 1;
+}
+
+message SetAppVolumeCmd {
+  string app_name = 1;
+  uint32 volume   = 2;
+}
+
+message SetMicrophoneCmd {
+  bool active = 1;
+}
+
+message SetDndCmd {
+  bool active = 1;
+}

@@ -1,0 +1,136 @@
+syntax = "proto3";
+package arcrelay.transport.v1;
+
+// This is the only connection-level protocol in v1. The major version is
+// carried by ALPN and repeated in SessionHello so transcript signatures bind
+// the negotiated protocol. Minor versions are negotiated as an overlap.
+enum SessionKind {
+  SESSION_KIND_UNSPECIFIED = 0;
+  SESSION_KIND_PAIRING = 1;
+  SESSION_KIND_CONTROL = 2;
+  SESSION_KIND_REALTIME_INPUT = 3;
+  SESSION_KIND_FILE_TRANSFER = 4;
+  SESSION_KIND_PRINT = 5;
+  // Short-lived, feature-less authenticated session used to discover an
+  // ArcRelay identity at a directly supplied LAN endpoint.
+  SESSION_KIND_DISCOVERY_PROBE = 6;
+}
+
+message SessionHello {
+  uint32 protocol_major = 1;
+  SessionKind session_kind = 2;
+  string device_id = 3;
+  string device_name = 4;
+  string platform = 5;
+  string model = 6;
+  bytes nonce = 7;
+  bytes root_public_key = 8;
+  bytes endpoint_certificate_sha256 = 9;
+  bytes endpoint_binding_signature = 10;
+  uint32 min_protocol_minor = 11;
+  uint32 max_protocol_minor = 12;
+}
+
+message SessionAuth {
+  string device_id = 1;
+  bytes signature = 2;
+}
+
+message SessionAccepted {
+  uint64 session_id = 1;
+  int64 accepted_at_ms = 2;
+  // Sent only after the signed identity exchange succeeds. The transport's
+  // observed source port is ephemeral for inbound sessions and must not be
+  // remembered as a dialable endpoint.
+  uint32 listen_port = 3;
+  uint32 protocol_minor = 4;
+  // Random 16-byte identifier for this network-runtime lifetime, shared by
+  // direct and relayed sessions. Sent inside the authenticated transport, not
+  // SessionHello's signed transcript. Empty means a legacy peer.
+  bytes process_instance_id = 5;
+}
+
+message PairingRequest {
+  repeated CapabilityGrant requested_grants = 1;
+}
+
+message PairingResult {
+  bool paired = 1;
+  string peer_id = 2;
+  string error = 3;
+}
+
+message PairingResponse {
+  PairingResult result = 1;
+  repeated CapabilityGrant granted_grants = 2;
+}
+
+enum GrantDirection {
+  GRANT_DIRECTION_UNSPECIFIED = 0;
+  GRANT_DIRECTION_INBOUND = 1;
+  GRANT_DIRECTION_OUTBOUND = 2;
+}
+
+message CapabilityGrant {
+  string capability = 1;
+  GrantDirection direction = 2;
+  GrantConstraints constraints = 3;
+  int64 granted_at_ms = 4;
+}
+
+message GrantConstraints {
+  oneof kind {
+    RemoteFileShareConstraints remote_file_shares = 1;
+  }
+}
+
+message RemoteFileShareConstraints {
+  repeated string share_ids = 1;
+  bool writable = 2;
+}
+
+message ContentDescriptor {
+  string content_id = 1;
+  string name = 2;
+  string media_type = 3;
+  uint64 length = 4;
+  bytes sha256 = 5;
+}
+
+message ContentTicket {
+  ContentDescriptor descriptor = 1;
+  bytes token = 2;
+  int64 expires_at_ms = 3;
+  string purpose = 4;
+}
+
+// The first framed message on each bidirectional feature stream. The feature
+// version is negotiated independently from the transport protocol so features
+// can evolve without forcing a new ALPN major version.
+message FeaturePayload {
+  string feature_id = 1;
+  bytes body = 2;
+  uint32 feature_major = 3;
+  uint32 min_feature_minor = 4;
+  uint32 max_feature_minor = 5;
+  uint64 stream_id = 6;
+  string operation = 7;
+}
+
+// One-hop tunnel on an already authorized realtime-input session. The relay
+// copies framed QUIC packets; the endpoints perform a second, end-to-end v1
+// identity handshake using their own pairing records before accepting input.
+message InputRelayOpen {
+  uint32 version = 1;
+  string workspace_id = 2;
+  string source_device_id = 3;
+  string target_device_id = 4;
+  // Only the middle device sets this. A forwarded request must terminate at
+  // target_device_id and can never be forwarded for another hop.
+  bool forwarded = 5;
+}
+
+message InputRelayReady {
+  bool accepted = 1;
+  string error = 2;
+}

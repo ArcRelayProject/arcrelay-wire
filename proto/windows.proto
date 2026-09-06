@@ -1,0 +1,41 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+import "blob.proto";
+
+message ListWindowsRequest {
+  bool include_thumbnails = 1;
+  // Empty preserves the v3 legacy behavior (all thumbnails). New clients
+  // should send only the currently visible window IDs.
+  repeated uint32 thumbnail_window_ids = 2;
+}
+
+// ── Window Manager ──────────────────────────────────────────────────
+
+message SpaceInfo {
+  uint64 space_id   = 1;
+  string label      = 2;
+  bool   is_active  = 3;
+}
+
+message WindowInfo {
+  uint32 window_id      = 1;
+  string title          = 2;
+  string app_name       = 3;
+  bool   is_focused     = 4;
+  optional BlobRef thumbnail = 5;
+  uint64 space_id       = 6;  // which Space / virtual desktop this window belongs to
+}
+
+message WindowListSnapshot {
+  repeated WindowInfo windows = 1;
+  repeated SpaceInfo  spaces  = 2;
+}
+
+message FocusWindowCmd {
+  uint32 window_id = 1;
+}
+
+message SwitchSpaceCmd {
+  uint64 space_id = 1;
+}

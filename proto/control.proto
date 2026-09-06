@@ -1,0 +1,308 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+import "actions.proto";
+import "blob.proto";
+import "clipboard.proto";
+import "device.proto";
+import "files.proto";
+import "input.proto";
+import "media.proto";
+import "notifications.proto";
+import "status.proto";
+import "system.proto";
+import "transfer.proto";
+import "windows.proto";
+
+enum Feature {
+  FEATURE_UNSPECIFIED       = 0;
+  FEATURE_SUBSCRIPTIONS     = 1;
+  FEATURE_SYSTEM            = 2;
+  FEATURE_PROCESSES         = 3;
+  FEATURE_MEDIA             = 4;
+  FEATURE_CLIPBOARD         = 5;
+  FEATURE_WINDOWS           = 6;
+  FEATURE_ACTIONS           = 7;
+  FEATURE_INPUT_RELIABLE    = 8;
+  FEATURE_INPUT_DATAGRAM    = 9 [deprecated = true];
+  FEATURE_BLOBS             = 10;
+  FEATURE_FILE_TRANSFER     = 11;
+  FEATURE_NOTIFICATIONS     = 12;
+  FEATURE_CLIPBOARD_SYNC    = 13;
+  FEATURE_REMOTE_FILES      = 14;
+  FEATURE_PRINTING          = 15;
+  // Routes one authenticated mobile input lease through the desktop's
+  // ArcInput workspace. The transport remains attached to the gateway while
+  // logical_target_device_id follows cross-screen handoffs.
+  FEATURE_WORKSPACE_INPUT   = 16;
+}
+
+message FeatureVersion {
+  Feature feature = 1;
+  uint32 min_version = 2;
+  uint32 max_version = 3;
+}
+
+message ProtocolLimits {
+  uint32 max_control_frame_bytes = 1;
+  uint32 max_reliable_input_frame_bytes = 2;
+  uint32 max_datagram_bytes = 3;
+  uint32 max_concurrent_requests = 4;
+  uint32 heartbeat_interval_ms = 5;
+  uint32 heartbeat_timeout_ms = 6;
+  uint32 max_blob_chunk_bytes = 7;
+  uint32 max_remote_file_message_bytes = 8;
+  uint64 max_remote_file_content_bytes = 9;
+  uint32 max_print_chunk_bytes = 10;
+  uint64 max_print_document_bytes = 11;
+}
+
+enum CapabilityDirection {
+  CAPABILITY_DIRECTION_UNSPECIFIED = 0;
+  CAPABILITY_DIRECTION_INBOUND = 1;
+  CAPABILITY_DIRECTION_OUTBOUND = 2;
+}
+
+message GrantedCapability {
+  string capability = 1;
+  // Inbound means the remote peer may act on this server.
+  CapabilityDirection direction = 2;
+  CapabilityConstraints constraints = 3;
+  int64 granted_at_ms = 4;
+}
+
+message CapabilityConstraints {
+  oneof kind {
+    RemoteFileCapabilityConstraints remote_file_shares = 1;
+  }
+}
+
+// The first control frame sent by a client. A feature is selected only when
+// the client and server ranges overlap; the welcome reports a single selected
+// version by setting min_version == max_version.
+message ControlHello {
+  repeated FeatureVersion features = 1;
+  ProtocolLimits receive_limits = 2;
+}
+
+// The first control frame sent by the server. Grants are authoritative for
+// this authenticated session; clients must not infer them from local defaults.
+message ControlWelcome {
+  repeated FeatureVersion features = 1;
+  ProtocolLimits limits = 2;
+  repeated GrantedCapability grants = 3;
+  uint64 authorization_epoch = 4;
+  int64 server_time_ms = 5;
+}
+
+// Every peer-initiated request_id is non-zero and must not be reused while a
+// response with that ID is outstanding. CancelRequest is the exception: its
+// request_id refers to an existing Request rather than starting a new one.
+message ClientControlFrame {
+  oneof body {
+    ControlHello hello = 1;
+    Request request = 10;
+    CancelRequest cancel_request = 11;
+    SubscribeRequest subscribe = 20;
+    UnsubscribeRequest unsubscribe = 21;
+    Ping ping = 30;
+    BeginInputSessionRequest begin_input_session = 40;
+    EndInputSessionRequest end_input_session = 41;
+    TransferOffer transfer_offer = 49;
+    TransferAccept transfer_accept = 50;
+    TransferCancel transfer_cancel = 51;
+    TransferProgress transfer_progress = 52;
+  }
+}
+
+message ServerControlFrame {
+  oneof body {
+    ControlWelcome welcome = 1;
+    Response response = 10;
+    SubscriptionResult subscription_result = 20;
+    Event event = 21;
+    Pong pong = 30;
+    InputSessionResult input_session_result = 40;
+    InputFeedback input_feedback = 41;
+    InputFocusChanged input_focus_changed = 42;
+    TransferOffer transfer_offer = 50;
+    TransferAccept transfer_accept = 51;
+    TransferCancel transfer_cancel = 52;
+    TransferProgress transfer_progress = 53;
+    GoAway go_away = 60;
+  }
+}
+
+message Request {
+  uint64 request_id = 1;
+  uint32 timeout_ms = 2;
+  bytes idempotency_key = 3;
+  oneof body {
+    Query query = 10;
+    Command command = 11;
+    GetBlobRequest get_blob = 12;
+  }
+}
+
+message CancelRequest {
+  uint64 request_id = 1;
+}
+
+message Response {
+  uint64 request_id = 1;
+  Status status = 2;
+  oneof body {
+    Snapshot snapshot = 10;
+    CommandResult command_result = 11;
+    BlobTicket blob_ticket = 12;
+  }
+}
+
+message Query {
+  oneof body {
+    Empty get_system = 1;
+    ListProcessesRequest list_processes = 2;
+    Empty get_media = 3;
+    GetClipboardRequest get_clipboard = 4;
+    Empty get_devices = 5;
+    ListWindowsRequest list_windows = 6;
+    ListActionsRequest list_actions = 7;
+    GetActionOutputRequest get_action_output = 8;
+    GetNotificationsRequest get_notifications = 9;
+    GetClipboardSyncRequest get_clipboard_sync = 10;
+  }
+}
+
+message Snapshot {
+  uint64 revision = 1;
+  int64 captured_at_ms = 2;
+  oneof data {
+    SystemSnapshot system = 10;
+    ProcessListSnapshot processes = 11;
+    MediaStateSnapshot media = 12;
+    ClipboardSnapshot clipboard = 13;
+    DeviceSnapshot devices = 14;
+    WindowListSnapshot windows = 15;
+    ActionListSnapshot actions = 16;
+    ActionOutputSnapshot action_output = 17;
+    NotificationListSnapshot notifications = 18;
+    ClipboardSyncPage clipboard_sync = 19;
+  }
+}
+
+message CommandResult {
+  string output = 1;
+}
+
+enum SubscriptionTopic {
+  SUBSCRIPTION_TOPIC_UNSPECIFIED = 0;
+  SUBSCRIPTION_TOPIC_SYSTEM = 1;
+  SUBSCRIPTION_TOPIC_MEDIA = 2;
+  SUBSCRIPTION_TOPIC_WINDOWS = 3;
+  SUBSCRIPTION_TOPIC_CLIPBOARD = 4;
+  // Action/workflow catalog snapshots. Output streaming uses ACTION_OUTPUT.
+  SUBSCRIPTION_TOPIC_ACTIONS = 5;
+  SUBSCRIPTION_TOPIC_ACTION_OUTPUT = 6;
+  SUBSCRIPTION_TOPIC_NOTIFICATIONS = 7;
+  SUBSCRIPTION_TOPIC_CLIPBOARD_SYNC = 8;
+}
+
+message SubscribeRequest {
+  uint64 request_id = 1;
+  SubscriptionTopic topic = 2;
+}
+
+message UnsubscribeRequest {
+  uint64 request_id = 1;
+  uint64 subscription_id = 2;
+}
+
+message SubscriptionResult {
+  uint64 request_id = 1;
+  Status status = 2;
+  // Successful subscribe: new non-zero ID. Failed subscribe: zero. An
+  // unsubscribe echoes the requested ID on both success and failure.
+  uint64 subscription_id = 3;
+  // Successful subscribe echoes the requested topic. Successful unsubscribe
+  // echoes the removed topic. A failed unsubscribe uses UNSPECIFIED.
+  SubscriptionTopic topic = 4;
+  // Sequence of the first possible event after a successful subscribe.
+  // All failures and all unsubscribe results use zero.
+  uint64 next_sequence = 5;
+}
+
+message Event {
+  uint64 subscription_id = 1;
+  uint64 sequence = 2;
+  int64 captured_at_ms = 3;
+  oneof data {
+    SystemSnapshot system = 10;
+    MediaStateSnapshot media = 11;
+    WindowListSnapshot windows = 12;
+    ClipboardSnapshot clipboard = 13;
+    ActionListSnapshot actions = 14;
+    ActionOutputChunk action_output = 15;
+    EventGap gap = 16;
+    NotificationListSnapshot notifications = 17;
+    ClipboardSyncRecord clipboard_sync = 18;
+  }
+}
+
+message EventGap {
+  uint64 first_missing_sequence = 1;
+  // Sequence of the next event that may contain topic data. The gap marker's
+  // own sequence is also unavailable topic data.
+  uint64 next_available_sequence = 2;
+  bool resync_required = 3;
+  // Topic-specific resource identifiers affected by the gap. For action
+  // output subscriptions these are quick-action IDs to query again.
+  repeated string resource_ids = 4;
+}
+
+message Ping {
+  uint64 request_id = 1;
+  int64 monotonic_elapsed_us = 2;
+}
+
+message Pong {
+  uint64 request_id = 1;
+  int64 client_monotonic_elapsed_us = 2;
+  int64 server_time_ms = 3;
+}
+
+message GoAway {
+  Status status = 1;
+}
+
+// ── Commands (client → server mutations) ────────────────────────────
+
+message Command {
+  oneof action {
+    PlaybackActionCmd          playback_action        = 1;
+    SetSystemVolumeCmd         set_system_volume      = 2;
+    SetAppVolumeCmd            set_app_volume         = 3;
+    SetMicrophoneCmd           set_microphone         = 4;
+    SetDndCmd                  set_dnd                = 5;
+    KillProcessCmd             kill_process           = 6;
+    SetClipboardCmd            set_clipboard          = 7;
+    ClearClipboardHistoryCmd   clear_clipboard_history = 8;
+    FocusWindowCmd             focus_window             = 9;
+    SwitchSpaceCmd             switch_space             = 10;
+    ExecuteQuickActionCmd      execute_quick_action     = 11;
+
+    PasteClipboardRecordCmd    paste_clipboard_record   = 13;
+    MarkNotificationReadCmd    mark_notification_read   = 14;
+
+    DeleteClipboardRecordCmd   delete_clipboard_record  = 16;
+    SetClipboardFavoriteCmd    set_clipboard_favorite   = 17;
+    UpdateClipboardPolicyCmd   update_clipboard_policy  = 18;
+    ApplyClipboardSyncRecordCmd apply_clipboard_sync_record = 19;
+    CreateClipboardLabelCmd    create_clipboard_label   = 20;
+    UpdateClipboardLabelCmd    update_clipboard_label   = 21;
+    DeleteClipboardLabelCmd    delete_clipboard_label   = 22;
+    SetClipboardLabelsCmd      set_clipboard_labels     = 23;
+    RunAutomationCmd           run_automation           = 24;
+    SetAutomationEnabledCmd    set_automation_enabled   = 25;
+    CancelAutomationCmd        cancel_automation        = 26;
+  }
+}

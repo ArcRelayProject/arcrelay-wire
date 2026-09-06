@@ -1,0 +1,68 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+
+message ListActionsRequest {}
+
+message GetActionOutputRequest {
+  string action_id = 1;
+}
+
+// ── Quick Actions ───────────────────────────────────────────────────
+
+message QuickActionInfo {
+  string id               = 1;
+  string name             = 2;
+  string icon_id          = 3;
+  string icon_svg         = 4;  // sanitized portable SVG markup
+  string color            = 5;
+  string group            = 6;
+  string action_type_label = 7;
+  uint32 sort_order       = 8;
+  bool   is_toggle        = 9;  // true for toggle-mode actions
+  bool   is_running       = 10; // true when toggle process is active
+  bool   requires_confirmation = 11; // destructive or disruptive action
+}
+
+
+message ActionListSnapshot {
+  repeated QuickActionInfo actions  = 1;
+  repeated AutomationInfo automations = 2;
+}
+
+// Host-owned automation summary. Scripts and executable configuration never leave the Host.
+message AutomationInfo {
+  string id = 1;
+  string name = 2;
+  string summary = 3;
+  bool enabled = 4;
+  optional string latest_activity_id = 5;
+  optional string latest_status = 6;
+  optional string reason = 7;
+  optional int64 next_run_at_ms = 8;
+  uint32 completed_steps = 9;
+  uint32 total_steps = 10;
+}
+
+message RunAutomationCmd { string automation_id = 1; }
+
+message SetAutomationEnabledCmd { string automation_id = 1; bool enabled = 2; }
+
+message CancelAutomationCmd { string activity_id = 1; }
+
+// Action process output (streaming + snapshot)
+message ActionOutputChunk {
+  string action_id     = 1;
+  repeated string lines = 2;   // one or more output lines
+}
+
+message ActionOutputSnapshot {
+  string action_id      = 1;
+  repeated string lines = 2;   // ring buffer contents
+}
+
+message ExecuteQuickActionCmd {
+  string action_id = 1;
+}
+
+

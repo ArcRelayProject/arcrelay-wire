@@ -1,0 +1,75 @@
+syntax = "proto3";
+package arcrelay.v1;
+
+
+message ListProcessesRequest {
+  ProcessSortBy sort_by = 1;
+}
+
+// Domain types
+
+// ── System Monitor ──────────────────────────────────────────────────
+
+message SystemSnapshot {
+  CpuInfo      cpu     = 1;
+  MemoryInfo   memory  = 2;
+  repeated GpuInfo  gpus  = 3;
+  repeated DiskInfo disks = 4;
+  NetworkStats network  = 5;
+}
+
+message CpuInfo {
+  float  usage_percent        = 1;
+  uint32 core_count           = 2;
+  optional float temperature_celsius = 3;
+  string model_name           = 4;
+}
+
+message MemoryInfo {
+  uint64 used_bytes     = 1;
+  uint64 total_bytes    = 2;
+  float  usage_percent  = 3;
+}
+
+message GpuInfo {
+  string name                    = 1;
+  optional float usage_percent          = 2;
+  optional float temperature_celsius    = 3;
+}
+
+message DiskInfo {
+  string name          = 1;
+  uint64 used_bytes    = 2;
+  uint64 total_bytes   = 3;
+  float  usage_percent = 4;
+}
+
+message NetworkStats {
+  uint64 download_bytes_per_sec = 1;
+  uint64 upload_bytes_per_sec   = 2;
+}
+
+// ── Process ─────────────────────────────────────────────────────────
+
+message ProcessInfo {
+  uint32 pid          = 1;
+  string name         = 2;
+  float  cpu_percent  = 3;
+  uint64 memory_bytes = 4;
+}
+
+message ProcessListSnapshot {
+  repeated ProcessInfo processes = 1;
+  optional string focused_app_name = 2;
+}
+
+enum ProcessSortBy {
+  PROCESS_SORT_BY_UNSPECIFIED = 0;
+  PROCESS_SORT_BY_CPU         = 1;
+  PROCESS_SORT_BY_MEMORY      = 2;
+  PROCESS_SORT_BY_NAME        = 3;
+}
+
+message KillProcessCmd {
+  uint32 pid = 1;
+}
