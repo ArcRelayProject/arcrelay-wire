@@ -96,6 +96,45 @@ message RemoteFileUploadRequest {
   optional int64 expected_modified_at_ms = 6;
 }
 
+// Online filesystem operations. Existing v2 operations remain wire-compatible.
+// Clients probe Stat on the share root before offering a system folder.
+message RemoteFileStatRequest {
+  string share_id = 1;
+  string relative_path = 2;
+}
+
+message RemoteFileMoveRequest {
+  string share_id = 1;
+  string relative_path = 2;
+  string destination_path = 3;
+  bool overwrite = 4;
+  string expected_revision = 5;
+}
+
+message RemoteFileConditionalDeleteRequest {
+  string share_id = 1;
+  string relative_path = 2;
+  string expected_revision = 3;
+  bool recursive = 4;
+}
+
+message RemoteFileReadRangeRequest {
+  string share_id = 1;
+  string relative_path = 2;
+  uint64 offset = 3;
+  uint32 length = 4;
+  string revision = 5;
+}
+
+message RemoteFileConditionalUploadRequest {
+  string share_id = 1;
+  string relative_path = 2;
+  string name = 3;
+  uint64 size = 4;
+  // Empty means create only; otherwise replace precisely this revision.
+  string expected_revision = 5;
+}
+
 message RemoteFileRequestFrame {
   oneof body {
     RemoteFileListSharesRequest list_shares = 10;
@@ -106,6 +145,11 @@ message RemoteFileRequestFrame {
     RemoteFileDownloadRequest download = 15;
     RemoteFileThumbnailRequest thumbnail = 16;
     RemoteFileUploadRequest upload = 17;
+    RemoteFileStatRequest stat = 18;
+    RemoteFileMoveRequest move = 19;
+    RemoteFileReadRangeRequest read_range = 20;
+    RemoteFileConditionalUploadRequest conditional_upload = 21;
+    RemoteFileConditionalDeleteRequest conditional_delete = 22;
   }
 }
 
@@ -119,6 +163,8 @@ message RemoteFileResponseFrame {
   uint64 thumbnail_size = 7;
   optional string thumbnail_media_type = 8;
   optional RemoteFileErrorCode error_code = 9;
+  string revision = 10;
+  bytes range_data = 11;
 }
 
 enum RemoteFileErrorCode {
