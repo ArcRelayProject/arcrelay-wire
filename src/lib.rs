@@ -34,6 +34,7 @@ pub const STREAM_KIND_REMOTE_FILES: u8 = 7;
 
 pub const STREAM_KIND_PRINT_DOCUMENT_UPLOAD: u8 = 8;
 pub const STREAM_KIND_INPUT_RELAY: u8 = 9;
+pub const STREAM_KIND_CLIPBOARD_REPLICA: u8 = 10;
 pub const MAX_INPUT_RELAY_HEADER_SIZE: usize = 4096;
 pub const MAX_INPUT_RELAY_PACKET_SIZE: usize = 65535;
 
@@ -102,6 +103,7 @@ mod tests {
             STREAM_KIND_REMOTE_FILES,
             STREAM_KIND_PRINT_DOCUMENT_UPLOAD,
             STREAM_KIND_INPUT_RELAY,
+            STREAM_KIND_CLIPBOARD_REPLICA,
         ];
         assert!(kinds.iter().all(|kind| *kind != 0));
         for (index, kind) in kinds.iter().enumerate() {
