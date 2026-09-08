@@ -205,3 +205,53 @@ message SetClipboardLabelsCmd {
 message UpdateClipboardPolicyCmd {
   ClipboardPolicy policy = 1;
 }
+
+// ClipboardSync feature version 2. These requests run on a separately bounded,
+// symmetric stream after authenticated control negotiation. Payload parts are
+// transferred as length-delimited chunks immediately after a record header;
+// manifest pages never allocate or advertise BlobStore entries.
+message ClipboardReplicaCursor {
+  int64 captured_at_ms = 1;
+  string sync_id = 2;
+}
+message ClipboardReplicaScan {
+  optional ClipboardReplicaCursor cursor = 1;
+  uint32 limit = 2;
+}
+message ClipboardReplicaRecord {
+  ClipboardSyncRecord metadata = 1;
+  int64 first_captured_at_ms = 2;
+  uint32 copy_count = 3;
+  // Ordered text/plain-text, HTML, optional RTF, or PNG parts as appropriate.
+  repeated BlobRef parts = 4;
+  bool metadata_only = 5;
+}
+message ClipboardReplicaLabels {
+  repeated ClipboardLabel labels = 1;
+  optional string next_cursor = 2;
+}
+message ClipboardReplicaRequest {
+  oneof body {
+    bool revision = 1;
+    ClipboardReplicaScan scan = 2;
+    string fetch = 3;
+    ClipboardReplicaRecord store = 4;
+    string scan_labels = 5;
+    ClipboardReplicaLabels store_labels = 6;
+    ClipboardReplicaRecord check = 7;
+  }
+}
+message ClipboardReplicaPage {
+  repeated ClipboardReplicaRecord records = 1;
+  optional ClipboardReplicaCursor next_cursor = 2;
+}
+message ClipboardReplicaResponse {
+  Status status = 1;
+  oneof body {
+    uint64 revision = 2;
+    ClipboardReplicaPage page = 3;
+    ClipboardReplicaRecord record = 4;
+    uint32 changed = 5;
+    ClipboardReplicaLabels labels = 6;
+  }
+}
