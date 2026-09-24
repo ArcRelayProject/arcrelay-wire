@@ -45,6 +45,8 @@ message RemoteFileEntryInfo {
   RemoteFileEntryKind kind = 3;
   uint64 size = 4;
   int64 modified_at_ms = 5;
+  string revision = 6;
+  string id = 7;
 }
 
 message RemoteFileListSharesRequest {}
@@ -135,6 +137,14 @@ message RemoteFileConditionalUploadRequest {
   string expected_revision = 5;
 }
 
+// A long-poll cursor for changes to a shared folder. A new epoch means the
+// caller must reconcile its previously enumerated directories before waiting.
+message RemoteFileWatchChangesRequest {
+  string share_id = 1;
+  string epoch = 2;
+  uint64 after_sequence = 3;
+}
+
 message RemoteFileRequestFrame {
   oneof body {
     RemoteFileListSharesRequest list_shares = 10;
@@ -150,6 +160,7 @@ message RemoteFileRequestFrame {
     RemoteFileReadRangeRequest read_range = 20;
     RemoteFileConditionalUploadRequest conditional_upload = 21;
     RemoteFileConditionalDeleteRequest conditional_delete = 22;
+    RemoteFileWatchChangesRequest watch_changes = 23;
   }
 }
 
@@ -165,6 +176,10 @@ message RemoteFileResponseFrame {
   optional RemoteFileErrorCode error_code = 9;
   string revision = 10;
   bytes range_data = 11;
+  string change_epoch = 12;
+  uint64 change_sequence = 13;
+  repeated string changed_directories = 14;
+  bool change_reset = 15;
 }
 
 enum RemoteFileErrorCode {
