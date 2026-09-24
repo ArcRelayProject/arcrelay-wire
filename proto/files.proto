@@ -45,7 +45,9 @@ message RemoteFileEntryInfo {
   RemoteFileEntryKind kind = 3;
   uint64 size = 4;
   int64 modified_at_ms = 5;
+  // The revision changes when the entry content or metadata changes.
   string revision = 6;
+  // The ID stays stable when the entry is renamed within the share.
   string id = 7;
 }
 
@@ -177,6 +179,7 @@ message RemoteFileResponseFrame {
   string revision = 10;
   bytes range_data = 11;
   string change_epoch = 12;
+  // Sequence numbers are scoped to change_epoch.
   uint64 change_sequence = 13;
   repeated string changed_directories = 14;
   bool change_reset = 15;
